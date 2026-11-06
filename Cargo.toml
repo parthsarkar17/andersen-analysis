@@ -1,0 +1,13 @@
+[package]
+name = "andersen-analysis"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+either = "1.19.0"
+itertools = "0.15.0"
+llvm-ir = { version = "0.11.3", features = ["llvm-19"] }
+
+[build-dependencies]
+cc = "1.11.1"
