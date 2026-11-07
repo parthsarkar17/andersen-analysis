@@ -1,0 +1,111 @@
+Load(Load { address: LocalOperand { name: Number(0), ty: TypeRef(PointerType { addr_space: 0 }) }, dest: Number(3), loaded_ty: TypeRef(IntegerType { bits: 32 }), volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 14, col: Some(19), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Load(Load { address: LocalOperand { name: Number(1), ty: TypeRef(PointerType { addr_space: 0 }) }, dest: Number(4), loaded_ty: TypeRef(IntegerType { bits: 32 }), volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 15, col: Some(10), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Store(Store { address: LocalOperand { name: Number(0), ty: TypeRef(PointerType { addr_space: 0 }) }, value: LocalOperand { name: Number(4), ty: TypeRef(IntegerType { bits: 32 }) }, volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 15, col: Some(8), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Store(Store { address: LocalOperand { name: Number(1), ty: TypeRef(PointerType { addr_space: 0 }) }, value: LocalOperand { name: Number(3), ty: TypeRef(IntegerType { bits: 32 }) }, volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 16, col: Some(8), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Alloca(Alloca { allocated_type: TypeRef(IntegerType { bits: 32 }), num_elements: ConstantOperand(ConstantRef(Int { bits: 32, value: 1 })), dest: Number(1), alignment: 4, debugloc: None })
+Alloca(Alloca { allocated_type: TypeRef(IntegerType { bits: 32 }), num_elements: ConstantOperand(ConstantRef(Int { bits: 32, value: 1 })), dest: Number(2), alignment: 4, debugloc: None })
+Alloca(Alloca { allocated_type: TypeRef(IntegerType { bits: 8 }), num_elements: ConstantOperand(ConstantRef(Int { bits: 32, value: 1 })), dest: Number(3), alignment: 1, debugloc: None })
+Alloca(Alloca { allocated_type: TypeRef(IntegerType { bits: 32 }), num_elements: ConstantOperand(ConstantRef(Int { bits: 32, value: 1 })), dest: Number(4), alignment: 4, debugloc: None })
+Alloca(Alloca { allocated_type: TypeRef(IntegerType { bits: 32 }), num_elements: ConstantOperand(ConstantRef(Int { bits: 32, value: 1 })), dest: Number(5), alignment: 4, debugloc: None })
+Store(Store { address: LocalOperand { name: Number(1), ty: TypeRef(PointerType { addr_space: 0 }) }, value: ConstantOperand(ConstantRef(Int { bits: 32, value: 37 })), volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 30, col: Some(9), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Store(Store { address: LocalOperand { name: Number(2), ty: TypeRef(PointerType { addr_space: 0 }) }, value: ConstantOperand(ConstantRef(Int { bits: 32, value: 45 })), volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 31, col: Some(9), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Store(Store { address: LocalOperand { name: Number(3), ty: TypeRef(PointerType { addr_space: 0 }) }, value: ConstantOperand(ConstantRef(Int { bits: 8, value: 97 })), volatile: false, atomicity: None, alignment: 1, debugloc: Some(DebugLoc { line: 32, col: Some(10), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Call(Call { function: Right(ConstantOperand(ConstantRef(GlobalReference { name: Name("malloc"), ty: TypeRef(FuncType { result_type: TypeRef(PointerType { addr_space: 0 }), param_types: [TypeRef(IntegerType { bits: 64 })], is_var_arg: false }) }))), function_ty: TypeRef(FuncType { result_type: TypeRef(PointerType { addr_space: 0 }), param_types: [TypeRef(IntegerType { bits: 64 })], is_var_arg: false }), arguments: [(ConstantOperand(ConstantRef(Int { bits: 64, value: 32 })), [NoUndef])], return_attributes: [NoAlias], dest: Some(Number(6)), function_attributes: [NoUnwind, AllocSize { elt_size: 0, num_elts: None }], is_tail_call: false, calling_convention: C, debugloc: Some(DebugLoc { line: 33, col: Some(28), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Load(Load { address: LocalOperand { name: Number(1), ty: TypeRef(PointerType { addr_space: 0 }) }, dest: Number(7), loaded_ty: TypeRef(IntegerType { bits: 32 }), volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 34, col: Some(17), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+GetElementPtr(GetElementPtr { address: LocalOperand { name: Number(6), ty: TypeRef(PointerType { addr_space: 0 }) }, indices: [ConstantOperand(ConstantRef(Int { bits: 32, value: 0 })), ConstantOperand(ConstantRef(Int { bits: 32, value: 0 }))], dest: Number(8), in_bounds: true, debugloc: Some(DebugLoc { line: 34, col: Some(8), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }), source_element_type: TypeRef(NamedStructType { name: "struct.some_class" }) })
+Store(Store { address: LocalOperand { name: Number(8), ty: TypeRef(PointerType { addr_space: 0 }) }, value: LocalOperand { name: Number(7), ty: TypeRef(IntegerType { bits: 32 }) }, volatile: false, atomicity: None, alignment: 8, debugloc: Some(DebugLoc { line: 34, col: Some(15), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+GetElementPtr(GetElementPtr { address: LocalOperand { name: Number(6), ty: TypeRef(PointerType { addr_space: 0 }) }, indices: [ConstantOperand(ConstantRef(Int { bits: 32, value: 0 })), ConstantOperand(ConstantRef(Int { bits: 32, value: 1 }))], dest: Number(9), in_bounds: true, debugloc: Some(DebugLoc { line: 35, col: Some(8), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }), source_element_type: TypeRef(NamedStructType { name: "struct.some_class" }) })
+Store(Store { address: LocalOperand { name: Number(9), ty: TypeRef(PointerType { addr_space: 0 }) }, value: LocalOperand { name: Number(3), ty: TypeRef(PointerType { addr_space: 0 }) }, volatile: false, atomicity: None, alignment: 8, debugloc: Some(DebugLoc { line: 35, col: Some(15), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+GetElementPtr(GetElementPtr { address: LocalOperand { name: Number(6), ty: TypeRef(PointerType { addr_space: 0 }) }, indices: [ConstantOperand(ConstantRef(Int { bits: 32, value: 0 })), ConstantOperand(ConstantRef(Int { bits: 32, value: 2 }))], dest: Number(10), in_bounds: true, debugloc: Some(DebugLoc { line: 36, col: Some(8), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }), source_element_type: TypeRef(NamedStructType { name: "struct.some_class" }) })
+Store(Store { address: LocalOperand { name: Number(10), ty: TypeRef(PointerType { addr_space: 0 }) }, value: ConstantOperand(ConstantRef(GlobalReference { name: Name("swap"), ty: TypeRef(FuncType { result_type: TypeRef(VoidType), param_types: [TypeRef(PointerType { addr_space: 0 }), TypeRef(PointerType { addr_space: 0 })], is_var_arg: false }) })), volatile: false, atomicity: None, alignment: 8, debugloc: Some(DebugLoc { line: 36, col: Some(14), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Load(Load { address: LocalOperand { name: Number(1), ty: TypeRef(PointerType { addr_space: 0 }) }, dest: Number(11), loaded_ty: TypeRef(IntegerType { bits: 32 }), volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 37, col: Some(17), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+GetElementPtr(GetElementPtr { address: LocalOperand { name: Number(6), ty: TypeRef(PointerType { addr_space: 0 }) }, indices: [ConstantOperand(ConstantRef(Int { bits: 32, value: 0 })), ConstantOperand(ConstantRef(Int { bits: 32, value: 3 }))], dest: Number(12), in_bounds: true, debugloc: Some(DebugLoc { line: 37, col: Some(8), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }), source_element_type: TypeRef(NamedStructType { name: "struct.some_class" }) })
+Store(Store { address: LocalOperand { name: Number(12), ty: TypeRef(PointerType { addr_space: 0 }) }, value: LocalOperand { name: Number(11), ty: TypeRef(IntegerType { bits: 32 }) }, volatile: false, atomicity: None, alignment: 8, debugloc: Some(DebugLoc { line: 37, col: Some(15), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+GetElementPtr(GetElementPtr { address: LocalOperand { name: Number(6), ty: TypeRef(PointerType { addr_space: 0 }) }, indices: [ConstantOperand(ConstantRef(Int { bits: 32, value: 0 })), ConstantOperand(ConstantRef(Int { bits: 32, value: 2 }))], dest: Number(13), in_bounds: true, debugloc: Some(DebugLoc { line: 39, col: Some(9), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }), source_element_type: TypeRef(NamedStructType { name: "struct.some_class" }) })
+Load(Load { address: LocalOperand { name: Number(13), ty: TypeRef(PointerType { addr_space: 0 }) }, dest: Number(14), loaded_ty: TypeRef(PointerType { addr_space: 0 }), volatile: false, atomicity: None, alignment: 8, debugloc: Some(DebugLoc { line: 39, col: Some(9), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Call(Call { function: Right(LocalOperand { name: Number(14), ty: TypeRef(PointerType { addr_space: 0 }) }), function_ty: TypeRef(FuncType { result_type: TypeRef(VoidType), param_types: [TypeRef(PointerType { addr_space: 0 }), TypeRef(PointerType { addr_space: 0 })], is_var_arg: false }), arguments: [(LocalOperand { name: Number(1), ty: TypeRef(PointerType { addr_space: 0 }) }, [NoUndef]), (LocalOperand { name: Number(2), ty: TypeRef(PointerType { addr_space: 0 }) }, [NoUndef])], return_attributes: [], dest: None, function_attributes: [], is_tail_call: false, calling_convention: C, debugloc: Some(DebugLoc { line: 39, col: Some(5), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Load(Load { address: LocalOperand { name: Number(1), ty: TypeRef(PointerType { addr_space: 0 }) }, dest: Number(15), loaded_ty: TypeRef(IntegerType { bits: 32 }), volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 40, col: Some(30), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Load(Load { address: LocalOperand { name: Number(2), ty: TypeRef(PointerType { addr_space: 0 }) }, dest: Number(16), loaded_ty: TypeRef(IntegerType { bits: 32 }), volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 40, col: Some(33), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Call(Call { function: Right(ConstantOperand(ConstantRef(GlobalReference { name: Name("printf"), ty: TypeRef(FuncType { result_type: TypeRef(IntegerType { bits: 32 }), param_types: [TypeRef(PointerType { addr_space: 0 })], is_var_arg: true }) }))), function_ty: TypeRef(FuncType { result_type: TypeRef(IntegerType { bits: 32 }), param_types: [TypeRef(PointerType { addr_space: 0 })], is_var_arg: true }), arguments: [(ConstantOperand(ConstantRef(GlobalReference { name: Name(".str"), ty: TypeRef(ArrayType { element_type: TypeRef(IntegerType { bits: 8 }), num_elements: 14 }) })), [NoUndef]), (LocalOperand { name: Number(15), ty: TypeRef(IntegerType { bits: 32 }) }, [NoUndef]), (LocalOperand { name: Number(16), ty: TypeRef(IntegerType { bits: 32 }) }, [NoUndef])], return_attributes: [], dest: Some(Number(17)), function_attributes: [], is_tail_call: false, calling_convention: C, debugloc: Some(DebugLoc { line: 40, col: Some(5), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Store(Store { address: LocalOperand { name: Number(4), ty: TypeRef(PointerType { addr_space: 0 }) }, value: ConstantOperand(ConstantRef(Int { bits: 32, value: 10 })), volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 43, col: Some(9), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Store(Store { address: LocalOperand { name: Number(5), ty: TypeRef(PointerType { addr_space: 0 }) }, value: ConstantOperand(ConstantRef(Int { bits: 32, value: 20 })), volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 44, col: Some(9), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Load(Load { address: ConstantOperand(ConstantRef(GetElementPtr(GetElementPtr { address: ConstantRef(GlobalReference { name: Name("global_obj"), ty: TypeRef(StructType { element_types: [TypeRef(IntegerType { bits: 32 }), TypeRef(ArrayType { element_type: TypeRef(IntegerType { bits: 8 }), num_elements: 4 }), TypeRef(PointerType { addr_space: 0 }), TypeRef(PointerType { addr_space: 0 }), TypeRef(IntegerType { bits: 32 }), TypeRef(ArrayType { element_type: TypeRef(IntegerType { bits: 8 }), num_elements: 4 })], is_packed: false }) }), indices: [ConstantRef(Int { bits: 32, value: 0 }), ConstantRef(Int { bits: 32, value: 2 })], in_bounds: true }))), dest: Number(18), loaded_ty: TypeRef(PointerType { addr_space: 0 }), volatile: false, atomicity: None, alignment: 8, debugloc: Some(DebugLoc { line: 45, col: Some(17), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Call(Call { function: Right(LocalOperand { name: Number(18), ty: TypeRef(PointerType { addr_space: 0 }) }), function_ty: TypeRef(FuncType { result_type: TypeRef(VoidType), param_types: [TypeRef(PointerType { addr_space: 0 }), TypeRef(PointerType { addr_space: 0 })], is_var_arg: false }), arguments: [(LocalOperand { name: Number(4), ty: TypeRef(PointerType { addr_space: 0 }) }, [NoUndef]), (LocalOperand { name: Number(5), ty: TypeRef(PointerType { addr_space: 0 }) }, [NoUndef])], return_attributes: [], dest: None, function_attributes: [], is_tail_call: false, calling_convention: C, debugloc: Some(DebugLoc { line: 45, col: Some(5), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Load(Load { address: LocalOperand { name: Number(4), ty: TypeRef(PointerType { addr_space: 0 }) }, dest: Number(19), loaded_ty: TypeRef(IntegerType { bits: 32 }), volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 47, col: Some(12), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Load(Load { address: LocalOperand { name: Number(5), ty: TypeRef(PointerType { addr_space: 0 }) }, dest: Number(20), loaded_ty: TypeRef(IntegerType { bits: 32 }), volatile: false, atomicity: None, alignment: 4, debugloc: Some(DebugLoc { line: 47, col: Some(15), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Load(Load { address: ConstantOperand(ConstantRef(GlobalReference { name: Name("global_obj"), ty: TypeRef(StructType { element_types: [TypeRef(IntegerType { bits: 32 }), TypeRef(ArrayType { element_type: TypeRef(IntegerType { bits: 8 }), num_elements: 4 }), TypeRef(PointerType { addr_space: 0 }), TypeRef(PointerType { addr_space: 0 }), TypeRef(IntegerType { bits: 32 }), TypeRef(ArrayType { element_type: TypeRef(IntegerType { bits: 8 }), num_elements: 4 })], is_packed: false }) })), dest: Number(21), loaded_ty: TypeRef(IntegerType { bits: 32 }), volatile: false, atomicity: None, alignment: 8, debugloc: Some(DebugLoc { line: 47, col: Some(29), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Load(Load { address: ConstantOperand(ConstantRef(GetElementPtr(GetElementPtr { address: ConstantRef(GlobalReference { name: Name("global_obj"), ty: TypeRef(StructType { element_types: [TypeRef(IntegerType { bits: 32 }), TypeRef(ArrayType { element_type: TypeRef(IntegerType { bits: 8 }), num_elements: 4 }), TypeRef(PointerType { addr_space: 0 }), TypeRef(PointerType { addr_space: 0 }), TypeRef(IntegerType { bits: 32 }), TypeRef(ArrayType { element_type: TypeRef(IntegerType { bits: 8 }), num_elements: 4 })], is_packed: false }) }), indices: [ConstantRef(Int { bits: 32, value: 0 }), ConstantRef(Int { bits: 32, value: 1 })], in_bounds: true }))), dest: Number(22), loaded_ty: TypeRef(PointerType { addr_space: 0 }), volatile: false, atomicity: None, alignment: 8, debugloc: Some(DebugLoc { line: 47, col: Some(49), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Load(Load { address: LocalOperand { name: Number(22), ty: TypeRef(PointerType { addr_space: 0 }) }, dest: Number(23), loaded_ty: TypeRef(IntegerType { bits: 8 }), volatile: false, atomicity: None, alignment: 1, debugloc: Some(DebugLoc { line: 47, col: Some(37), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+SExt(SExt { operand: LocalOperand { name: Number(23), ty: TypeRef(IntegerType { bits: 8 }) }, to_type: TypeRef(IntegerType { bits: 32 }), dest: Number(24), debugloc: Some(DebugLoc { line: 47, col: Some(37), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Load(Load { address: ConstantOperand(ConstantRef(GetElementPtr(GetElementPtr { address: ConstantRef(GlobalReference { name: Name("global_obj"), ty: TypeRef(StructType { element_types: [TypeRef(IntegerType { bits: 32 }), TypeRef(ArrayType { element_type: TypeRef(IntegerType { bits: 8 }), num_elements: 4 }), TypeRef(PointerType { addr_space: 0 }), TypeRef(PointerType { addr_space: 0 }), TypeRef(IntegerType { bits: 32 }), TypeRef(ArrayType { element_type: TypeRef(IntegerType { bits: 8 }), num_elements: 4 })], is_packed: false }) }), indices: [ConstantRef(Int { bits: 32, value: 0 }), ConstantRef(Int { bits: 32, value: 3 })], in_bounds: true }))), dest: Number(25), loaded_ty: TypeRef(IntegerType { bits: 32 }), volatile: false, atomicity: None, alignment: 8, debugloc: Some(DebugLoc { line: 47, col: Some(68), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Call(Call { function: Right(ConstantOperand(ConstantRef(GlobalReference { name: Name("printf"), ty: TypeRef(FuncType { result_type: TypeRef(IntegerType { bits: 32 }), param_types: [TypeRef(PointerType { addr_space: 0 })], is_var_arg: true }) }))), function_ty: TypeRef(FuncType { result_type: TypeRef(IntegerType { bits: 32 }), param_types: [TypeRef(PointerType { addr_space: 0 })], is_var_arg: true }), arguments: [(ConstantOperand(ConstantRef(GlobalReference { name: Name(".str.1"), ty: TypeRef(ArrayType { element_type: TypeRef(IntegerType { bits: 8 }), num_elements: 58 }) })), [NoUndef]), (LocalOperand { name: Number(19), ty: TypeRef(IntegerType { bits: 32 }) }, [NoUndef]), (LocalOperand { name: Number(20), ty: TypeRef(IntegerType { bits: 32 }) }, [NoUndef]), (LocalOperand { name: Number(21), ty: TypeRef(IntegerType { bits: 32 }) }, [NoUndef]), (LocalOperand { name: Number(24), ty: TypeRef(IntegerType { bits: 32 }) }, [NoUndef]), (LocalOperand { name: Number(25), ty: TypeRef(IntegerType { bits: 32 }) }, [NoUndef])], return_attributes: [], dest: Some(Number(26)), function_attributes: [], is_tail_call: false, calling_convention: C, debugloc: Some(DebugLoc { line: 46, col: Some(5), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+Call(Call { function: Right(ConstantOperand(ConstantRef(GlobalReference { name: Name("free"), ty: TypeRef(FuncType { result_type: TypeRef(VoidType), param_types: [TypeRef(PointerType { addr_space: 0 })], is_var_arg: false }) }))), function_ty: TypeRef(FuncType { result_type: TypeRef(VoidType), param_types: [TypeRef(PointerType { addr_space: 0 })], is_var_arg: false }), arguments: [(LocalOperand { name: Number(6), ty: TypeRef(PointerType { addr_space: 0 }) }, [NoUndef])], return_attributes: [], dest: None, function_attributes: [NoUnwind], is_tail_call: false, calling_convention: C, debugloc: Some(DebugLoc { line: 49, col: Some(5), filename: "call_graph.c", directory: Some("/home/parthsarkar/Desktop/UPenn/cis5470/pointer-analysis") }) })
+PointsToGraph {
+    graph: {
+        LocalVariable(
+            "main",
+            Number(
+                4,
+            ),
+        ): {
+            StackAllocPoint(
+                "main",
+                Number(
+                    4,
+                ),
+            ),
+        },
+        LocalVariable(
+            "main",
+            Number(
+                1,
+            ),
+        ): {
+            StackAllocPoint(
+                "main",
+                Number(
+                    1,
+                ),
+            ),
+        },
+        LocalVariable(
+            "main",
+            Number(
+                5,
+            ),
+        ): {
+            StackAllocPoint(
+                "main",
+                Number(
+                    5,
+                ),
+            ),
+        },
+        LocalVariable(
+            "main",
+            Number(
+                2,
+            ),
+        ): {
+            StackAllocPoint(
+                "main",
+                Number(
+                    2,
+                ),
+            ),
+        },
+        LocalVariable(
+            "main",
+            Number(
+                3,
+            ),
+        ): {
+            StackAllocPoint(
+                "main",
+                Number(
+                    3,
+                ),
+            ),
+        },
+    },
+}

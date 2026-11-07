@@ -1,45 +1,23 @@
 mod helpers;
-
 use anyhow as ah;
 use core::fmt;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
-/// For load/store instructions, Andersen analysis constraints
-/// state that [p = load q] should result in "p" receieving the
-/// points-to set of *q (i.e. the dereference of "q"). So,
-/// this enum just represents the difference between a
-/// variable and its dereference. If a variable is annotated
-/// with "Pointer", it's just a pointer variable. If
-/// a variable is annoated with "Deref", the variable is a
-/// pointer-to-a-pointer that has been dereferenced.
+/// This type is used as a key into the points-to set map.
 #[derive(Hash, PartialEq, Eq, Debug)]
-pub enum ConstraintVarType {
-    Deref,
-    Pointer,
-}
+pub enum Variable<'a> {
+    /// Global pointer variables can be identified by their name alone
+    GlobalVariable(&'a llvm_ir::Name),
 
-/// This type is used as a key into the points-to set map. For
-/// example, we might have a normal pointer variable that is the
-///  destination of an alloca. Then, the corresponding "Variable"
-/// will be Variable { name : %1, var_type : Pointer}.
-#[derive(Hash, PartialEq, Eq, Debug)]
-pub struct Variable<'a> {
-    name: &'a llvm_ir::Name,
-    var_type: ConstraintVarType,
-}
+    /// We need to localize function-local variables into their functions.
+    /// The String represents a function name, and Name is the name of the variable
+    LocalVariable(&'a String, &'a llvm_ir::Name),
 
-impl<'a> Variable<'a> {
-    pub fn new(name: &'a llvm_ir::Name, is_deref: bool) -> Self {
-        Self {
-            name,
-            var_type: if is_deref {
-                ConstraintVarType::Deref
-            } else {
-                ConstraintVarType::Pointer
-            },
-        }
-    }
+    /// When we load / store pointers from / into pointers-to-pointers, we
+    /// need to track the points-to sets of abstract locations themselves.
+    /// Hence, we add abstract locations as keys into the map.
+    AbstractLocation(AbstrLoc<'a>),
 }
 
 /// This type is used to represent the entries in each
@@ -99,19 +77,26 @@ impl<'a> PointsToGraph<'a> {
 
     /// Given the name of a local pointer variable, this function will return an immutable reference
     /// to the points-to set of that variable. If the variable is unmapped in the map, then
-    /// we insert the map (that's why we require a mutable reference to `self`).
-    pub fn query_non_deref(&self, name: &'a llvm_ir::Name) -> Option<&HashSet<AbstrLoc<'a>>> {
-        let v = Variable::new(name, false);
-        self.graph.get(&v)
-        // self.graph.entry(v).or_default()
+    /// we return None.
+    pub fn query_non_deref(
+        &self,
+        func: &'a llvm_ir::Function,
+        name: &'a llvm_ir::Name,
+    ) -> Option<&HashSet<AbstrLoc<'a>>> {
+        let name_var = Variable::LocalVariable(&func.name, name);
+        self.graph.get(&name_var)
     }
 
     /// Given the name of a local pointer variable, this function will return a mutable reference
     /// to the points-to set of that variable. If the variable is unmapped in the map, then
-    /// we insert the map (that's why we require a mutable reference to `self`).
-    pub fn query_non_deref_mut(&mut self, name: &'a llvm_ir::Name) -> &mut HashSet<AbstrLoc<'a>> {
-        let v = Variable::new(name, false);
-        self.graph.entry(v).or_default()
+    /// we insert the map.
+    pub fn query_non_deref_mut(
+        &mut self,
+        func: &'a llvm_ir::Function,
+        name: &'a llvm_ir::Name,
+    ) -> &mut HashSet<AbstrLoc<'a>> {
+        let name_var = Variable::LocalVariable(&func.name, name);
+        self.graph.entry(name_var).or_default()
     }
 
     pub fn build_graph(&mut self) -> ah::Result<()> {
@@ -122,33 +107,45 @@ impl<'a> PointsToGraph<'a> {
                     for instr in &bb.instrs {
                         match instr {
                             llvm_ir::Instruction::Alloca(alloca) => {
-                                let ptr_var = Variable::new(&alloca.dest, false);
+                                let ptr_var = Variable::LocalVariable(&f.name, &alloca.dest);
                                 let var_pts_to_set = self.graph.entry(ptr_var).or_default();
                                 changed |= var_pts_to_set.insert(AbstrLoc::from_alloca(f, alloca));
                             }
                             llvm_ir::Instruction::GetElementPtr(gep) => {
-                                let llvm_ir::Operand::LocalOperand { name, .. } = &gep.address
-                                else {
-                                    return Err(ah::anyhow!(
-                                        "Operand of GEP was unexpectedly a non-local variable: {gep:#?}"
-                                    ));
-                                };
-
                                 // get the stuff pointed to by the operand and put it into the
-                                // set of stuff ponted to by the destination
-                                if let Some(operand_points_to_set) = self
-                                    .query_non_deref(name)
-                                    .map(|s| s.iter().cloned().collect_vec())
-                                {
-                                    // condition for whether the dest set changed is length difference
-                                    let dest_points_to_set = self.query_non_deref_mut(&gep.dest);
-                                    let orig_len = dest_points_to_set.len();
-                                    dest_points_to_set.extend(operand_points_to_set);
-                                    let new_len = dest_points_to_set.len();
-                                    changed |= new_len > orig_len
+                                // set of stuff ponted to by the destination. this is conservative;
+                                // revisit for field-senstivie analysis later
+                                if let Some(name) = helpers::find_name_in_operand(&gep.address) {
+                                    if let Some(operand_points_to_set) = self
+                                        .query_non_deref(f, name)
+                                        .map(|s| s.iter().cloned().collect_vec())
+                                    {
+                                        // condition for whether the dest set changed is length difference
+                                        let dest_points_to_set =
+                                            self.query_non_deref_mut(f, &gep.dest);
+                                        let orig_len = dest_points_to_set.len();
+                                        dest_points_to_set.extend(operand_points_to_set);
+                                        let new_len = dest_points_to_set.len();
+                                        changed |= new_len > orig_len
+                                    }
                                 }
                             }
-                            llvm_ir::Instruction::BitCast(bitc) => {}
+                            llvm_ir::Instruction::BitCast(bitc) => {
+                                // Do the same thing with BitCast as we did above with GEP
+                                if let Some(name) = helpers::find_name_in_operand(&bitc.operand) {
+                                    if let Some(operand_points_to_set) = self
+                                        .query_non_deref(f, name)
+                                        .map(|s| s.iter().cloned().collect_vec())
+                                    {
+                                        let dest_points_to_set =
+                                            self.query_non_deref_mut(f, &bitc.dest);
+                                        let orig_len = dest_points_to_set.len();
+                                        dest_points_to_set.extend(operand_points_to_set);
+                                        let new_len = dest_points_to_set.len();
+                                        changed |= new_len > orig_len
+                                    }
+                                }
+                            }
                             llvm_ir::Instruction::Load(load) => {}
                             llvm_ir::Instruction::Store(store) => {}
                             llvm_ir::Instruction::Call(call) => {}
