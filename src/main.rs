@@ -114,37 +114,34 @@ impl<'a> PointsToGraph<'a> {
                         // get the stuff pointed to by the operand and put it into the
                         // set of stuff ponted to by the destination. this is conservative;
                         // revisit for field-senstivie analysis later
-                        if let Some(operand_var) = helpers::variable_from_operand(&gep.address, f) {
-                            if let Some(operand_var_pts_to_set) = self
+                        if let Some(operand_var) = helpers::variable_from_operand(&gep.address, f)
+                            && let Some(operand_var_pts_to_set) = self
                                 .graph
                                 .get(&operand_var)
                                 .map(|s| s.iter().cloned().collect_vec())
-                            {
-                                // condition for whether the dest set changed is length difference
-                                let dest_points_to_set = self.query_non_deref_mut(f, &gep.dest);
-                                let orig_len = dest_points_to_set.len();
-                                dest_points_to_set.extend(operand_var_pts_to_set);
-                                let new_len = dest_points_to_set.len();
-                                changed |= new_len > orig_len
-                            }
+                        {
+                            // condition for whether the dest set changed is length difference
+                            let dest_pts_to_set = self.query_non_deref_mut(f, &gep.dest);
+                            let orig_len = dest_pts_to_set.len();
+                            dest_pts_to_set.extend(operand_var_pts_to_set);
+                            let new_len = dest_pts_to_set.len();
+                            changed |= new_len > orig_len
                         }
                     }
                     llvm_ir::Instruction::BitCast(bitc) => {
                         // Do the same thing with BitCast as we did above with GEP
                         if let Some(operand_var) = helpers::variable_from_operand(&bitc.operand, f)
-                        {
-                            if let Some(operand_var_pts_to_set) = self
+                            && let Some(operand_var_pts_to_set) = self
                                 .graph
                                 .get(&operand_var)
                                 .map(|s| s.iter().cloned().collect_vec())
-                            {
-                                // condition for whether the dest set changed is length difference
-                                let dest_points_to_set = self.query_non_deref_mut(f, &bitc.dest);
-                                let orig_len = dest_points_to_set.len();
-                                dest_points_to_set.extend(operand_var_pts_to_set);
-                                let new_len = dest_points_to_set.len();
-                                changed |= new_len > orig_len
-                            }
+                        {
+                            // condition for whether the dest set changed is length difference
+                            let dest_pts_to_set = self.query_non_deref_mut(f, &bitc.dest);
+                            let orig_len = dest_pts_to_set.len();
+                            dest_pts_to_set.extend(operand_var_pts_to_set);
+                            let new_len = dest_pts_to_set.len();
+                            changed |= new_len > orig_len
                         }
                     }
                     llvm_ir::Instruction::Load(load) => {
@@ -185,9 +182,8 @@ impl<'a> PointsToGraph<'a> {
                         // it's not easy to get the type of the value being stored, so our condition
                         // for flowing the points-to set of the value operand into the dereference of the
                         // address operand is if the value operand is mapped at all. as we mentioned above,
-                        // it should never be the case that a non-pointer variable has a points-to set, so
+                        // it should never be the case that a non-pointer variable (e.g. int) has a points-to set,
                         // so this method should work
-                        
                     }
                     llvm_ir::Instruction::Call(call) => {}
                     _ => (),
@@ -221,6 +217,9 @@ fn main() -> ah::Result<()> {
     let mut points_to_graph = PointsToGraph::new(&module);
     points_to_graph.build_graph()?;
     println!("{points_to_graph:#?}");
+
+    let x = points_to_graph.graph.get(&Variable::GlobalVariable(&llvm_ir::Name::Number(1)));
+    println!("{x:#?}");
 
     Ok(())
 }
