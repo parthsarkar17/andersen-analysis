@@ -6,7 +6,7 @@ use std::collections::VecDeque;
 /// may directly refer by name to global variables, or they may be an inline
 /// GEP expression. I expect we'll only ever need to cover a couple
 /// (bitcast, global reference, and GEP).
-pub fn find_name_in_operand<'a>(
+pub fn variable_from_operand<'a>(
     op: &'a llvm_ir::Operand,
     f: &'a llvm_ir::Function,
 ) -> Option<Variable<'a>> {
@@ -30,11 +30,13 @@ pub fn find_name_in_operand<'a>(
                     },
                 }
             }
-            return name_opt;
+            name_opt
         }
     }
 }
 
+/// Returns all instructions (along with their parent BB and Function)
+/// in a first-level list to avoid nested for-loops when analyzing code.
 pub fn iter_instrs(
     m: &llvm_ir::Module,
 ) -> Vec<(
@@ -43,9 +45,9 @@ pub fn iter_instrs(
     &llvm_ir::Instruction,
 )> {
     let mut v = vec![];
-    for f in m.functions.iter() {
-        for bb in f.basic_blocks.iter() {
-            for i in bb.instrs.iter() {
+    for f in &m.functions {
+        for bb in &f.basic_blocks {
+            for i in &bb.instrs {
                 v.push((f, bb, i));
             }
         }

@@ -114,7 +114,7 @@ impl<'a> PointsToGraph<'a> {
                         // get the stuff pointed to by the operand and put it into the
                         // set of stuff ponted to by the destination. this is conservative;
                         // revisit for field-senstivie analysis later
-                        if let Some(operand_var) = helpers::find_name_in_operand(&gep.address, f) {
+                        if let Some(operand_var) = helpers::variable_from_operand(&gep.address, f) {
                             if let Some(operand_var_pts_to_set) = self
                                 .graph
                                 .get(&operand_var)
@@ -131,7 +131,8 @@ impl<'a> PointsToGraph<'a> {
                     }
                     llvm_ir::Instruction::BitCast(bitc) => {
                         // Do the same thing with BitCast as we did above with GEP
-                        if let Some(operand_var) = helpers::find_name_in_operand(&bitc.operand, f) {
+                        if let Some(operand_var) = helpers::variable_from_operand(&bitc.operand, f)
+                        {
                             if let Some(operand_var_pts_to_set) = self
                                 .graph
                                 .get(&operand_var)
@@ -146,8 +147,48 @@ impl<'a> PointsToGraph<'a> {
                             }
                         }
                     }
-                    llvm_ir::Instruction::Load(load) => {}
-                    llvm_ir::Instruction::Store(store) => {}
+                    llvm_ir::Instruction::Load(load) => {
+                        // obviously the operand we're loading from is a pointer, so we expect
+                        // it to have a points-to set (or maybe it's currently unmapped but will
+                        // eventually get a set). however, we only want the destination's set
+                        // to get updated if the destination is a pointer itself. we don't want
+                        // to pollute the map with a points-to entry for an integer, for example.
+                        if let llvm_ir::Type::PointerType { .. } = load.loaded_ty.as_ref()
+                            && let Some(operand_var) =
+                                helpers::variable_from_operand(&load.address, f)
+                            && let Some(operand_var_pts_to_set) = self
+                                .graph
+                                .get(&operand_var)
+                                .map(|s| s.iter().cloned().collect_vec())
+                        {
+                            // load constraint says that every location pointed to by
+                            // every element of the operand's points-to set should be
+                            // flowed into the destination pointer
+                            let points_to_of_deref_of_operand = operand_var_pts_to_set
+                                .into_iter()
+                                .filter_map(|abstr_loc| {
+                                    self.graph.get(&Variable::AbstractLocation(abstr_loc)).map(
+                                        |abstr_loc_pts_to_set| abstr_loc_pts_to_set.iter().cloned(),
+                                    )
+                                })
+                                .flatten()
+                                .collect_vec();
+
+                            let dest_pts_to_set = self.query_non_deref_mut(f, &load.dest);
+                            let orig_len = dest_pts_to_set.len();
+                            dest_pts_to_set.extend(points_to_of_deref_of_operand);
+                            let new_len = dest_pts_to_set.len();
+                            changed |= new_len > orig_len;
+                        }
+                    }
+                    llvm_ir::Instruction::Store(store) => {
+                        // it's not easy to get the type of the value being stored, so our condition
+                        // for flowing the points-to set of the value operand into the dereference of the
+                        // address operand is if the value operand is mapped at all. as we mentioned above,
+                        // it should never be the case that a non-pointer variable has a points-to set, so
+                        // so this method should work
+                        
+                    }
                     llvm_ir::Instruction::Call(call) => {}
                     _ => (),
                 }
@@ -178,7 +219,7 @@ fn main() -> ah::Result<()> {
     .map_err(|e| ah::anyhow!("{e}"))?;
 
     let mut points_to_graph = PointsToGraph::new(&module);
-    points_to_graph.build_graph();
+    points_to_graph.build_graph()?;
     println!("{points_to_graph:#?}");
 
     Ok(())
