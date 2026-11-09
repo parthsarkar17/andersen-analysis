@@ -100,62 +100,64 @@ impl<'a> PointsToGraph<'a> {
     }
 
     pub fn build_graph(&mut self) -> ah::Result<()> {
-        let mut changed = true;
-        while changed {
-            for f in &self.module.functions {
-                for bb in &f.basic_blocks {
-                    for instr in &bb.instrs {
-                        match instr {
-                            llvm_ir::Instruction::Alloca(alloca) => {
-                                let ptr_var = Variable::LocalVariable(&f.name, &alloca.dest);
-                                let var_pts_to_set = self.graph.entry(ptr_var).or_default();
-                                changed |= var_pts_to_set.insert(AbstrLoc::from_alloca(f, alloca));
+        let instr_vec = helpers::iter_instrs(&self.module);
+        loop {
+            let mut changed = false;
+            for (f, _, instr) in &instr_vec {
+                match instr {
+                    llvm_ir::Instruction::Alloca(alloca) => {
+                        let ptr_var = Variable::LocalVariable(&f.name, &alloca.dest);
+                        let var_pts_to_set = self.graph.entry(ptr_var).or_default();
+                        changed |= var_pts_to_set.insert(AbstrLoc::from_alloca(f, alloca));
+                    }
+                    llvm_ir::Instruction::GetElementPtr(gep) => {
+                        // get the stuff pointed to by the operand and put it into the
+                        // set of stuff ponted to by the destination. this is conservative;
+                        // revisit for field-senstivie analysis later
+                        if let Some(operand_var) = helpers::find_name_in_operand(&gep.address, f) {
+                            if let Some(operand_var_pts_to_set) = self
+                                .graph
+                                .get(&operand_var)
+                                .map(|s| s.iter().cloned().collect_vec())
+                            {
+                                // condition for whether the dest set changed is length difference
+                                let dest_points_to_set = self.query_non_deref_mut(f, &gep.dest);
+                                let orig_len = dest_points_to_set.len();
+                                dest_points_to_set.extend(operand_var_pts_to_set);
+                                let new_len = dest_points_to_set.len();
+                                changed |= new_len > orig_len
                             }
-                            llvm_ir::Instruction::GetElementPtr(gep) => {
-                                // get the stuff pointed to by the operand and put it into the
-                                // set of stuff ponted to by the destination. this is conservative;
-                                // revisit for field-senstivie analysis later
-                                if let Some(name) = helpers::find_name_in_operand(&gep.address) {
-                                    if let Some(operand_points_to_set) = self
-                                        .query_non_deref(f, name)
-                                        .map(|s| s.iter().cloned().collect_vec())
-                                    {
-                                        // condition for whether the dest set changed is length difference
-                                        let dest_points_to_set =
-                                            self.query_non_deref_mut(f, &gep.dest);
-                                        let orig_len = dest_points_to_set.len();
-                                        dest_points_to_set.extend(operand_points_to_set);
-                                        let new_len = dest_points_to_set.len();
-                                        changed |= new_len > orig_len
-                                    }
-                                }
-                            }
-                            llvm_ir::Instruction::BitCast(bitc) => {
-                                // Do the same thing with BitCast as we did above with GEP
-                                if let Some(name) = helpers::find_name_in_operand(&bitc.operand) {
-                                    if let Some(operand_points_to_set) = self
-                                        .query_non_deref(f, name)
-                                        .map(|s| s.iter().cloned().collect_vec())
-                                    {
-                                        let dest_points_to_set =
-                                            self.query_non_deref_mut(f, &bitc.dest);
-                                        let orig_len = dest_points_to_set.len();
-                                        dest_points_to_set.extend(operand_points_to_set);
-                                        let new_len = dest_points_to_set.len();
-                                        changed |= new_len > orig_len
-                                    }
-                                }
-                            }
-                            llvm_ir::Instruction::Load(load) => {}
-                            llvm_ir::Instruction::Store(store) => {}
-                            llvm_ir::Instruction::Call(call) => {}
-                            _ => (),
                         }
                     }
+                    llvm_ir::Instruction::BitCast(bitc) => {
+                        // Do the same thing with BitCast as we did above with GEP
+                        if let Some(operand_var) = helpers::find_name_in_operand(&bitc.operand, f) {
+                            if let Some(operand_var_pts_to_set) = self
+                                .graph
+                                .get(&operand_var)
+                                .map(|s| s.iter().cloned().collect_vec())
+                            {
+                                // condition for whether the dest set changed is length difference
+                                let dest_points_to_set = self.query_non_deref_mut(f, &bitc.dest);
+                                let orig_len = dest_points_to_set.len();
+                                dest_points_to_set.extend(operand_var_pts_to_set);
+                                let new_len = dest_points_to_set.len();
+                                changed |= new_len > orig_len
+                            }
+                        }
+                    }
+                    llvm_ir::Instruction::Load(load) => {}
+                    llvm_ir::Instruction::Store(store) => {}
+                    llvm_ir::Instruction::Call(call) => {}
+                    _ => (),
                 }
             }
-            changed = false;
+
+            if !changed {
+                break;
+            }
         }
+
         Ok(())
     }
 }
