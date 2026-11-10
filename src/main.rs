@@ -1,14 +1,16 @@
 mod helpers;
 use anyhow as ah;
 use core::fmt;
+use either::Either;
 use itertools::Itertools;
+use llvm_ir::Name;
 use std::collections::{HashMap, HashSet};
 
 /// This type is used as a key into the points-to set map.
 #[derive(Hash, PartialEq, Eq, Debug)]
 pub enum Variable<'a> {
-    /// Global pointer variables can be identified by their name alone
-    GlobalVariable(&'a llvm_ir::Name),
+    /// Global pointer variables can be identified by their name alone (if its an object) or by a String (if it's a function)
+    GlobalVariable(Either<&'a String, &'a Name>),
 
     /// We need to localize function-local variables into their functions.
     /// The String represents a function name, and Name is the name of the variable
@@ -28,10 +30,10 @@ pub enum Variable<'a> {
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum AbstrLoc<'a> {
     /// String represents function name
-    Function(&'a String),
+    // Function(&'a String),
 
     /// String represent global object variable name
-    Global(&'a String),
+    Global(Either<&'a String, &'a Name>),
 
     /// String represents function name, and "name" represents destination of malloc(..) call
     /// We use function-variable combinations as a unique identifier for this allocation point.
@@ -99,7 +101,49 @@ impl<'a> PointsToGraph<'a> {
         self.graph.entry(name_var).or_default()
     }
 
+    /// This function initializes the points-to map with initial information about globals.
+    /// Specifically, we map global variable names to global memory locations. Then, for each
+    /// of these memory locations, we also add points-to information when the memory itself
+    /// contains references to other memory locations. This is field insensitive! (for now)
+    fn initialize_map_with_globals(&mut self) -> ah::Result<()> {
+        let map = &mut self.graph;
+        for f in &self.module.functions {
+            let pts_to_set = map
+                .entry(Variable::GlobalVariable(Either::Left(&f.name)))
+                .or_default();
+            let abstr_loc = AbstrLoc::Global(Either::Left(&f.name));
+            pts_to_set.insert(abstr_loc);
+        }
+
+        for f in &self.module.func_declarations {
+            let pts_to_set = map
+                .entry(Variable::GlobalVariable(Either::Left(&f.name)))
+                .or_default();
+            let abstr_loc = AbstrLoc::Global(Either::Left(&f.name));
+            pts_to_set.insert(abstr_loc);
+        }
+
+        for glob in &self.module.global_vars {
+            let pts_to_set = map
+                .entry(Variable::GlobalVariable(Either::Right(&glob.name)))
+                .or_default();
+            let abstr_loc = AbstrLoc::Global(Either::Right(&glob.name));
+            pts_to_set.insert(abstr_loc.clone());
+            if let Some(initial_memory) = &glob.initializer {
+                map.entry(Variable::AbstractLocation(abstr_loc))
+                    .or_default()
+                    .extend(
+                        helpers::gather_all_global_refs(initial_memory)?
+                            .into_iter()
+                            .map(|name| AbstrLoc::Global(Either::Right(name))),
+                    );
+            }
+        }
+        Ok(())
+    }
+
     pub fn build_graph(&mut self) -> ah::Result<()> {
+        self.initialize_map_with_globals()?;
         let instr_vec = helpers::iter_instrs(&self.module);
         loop {
             let mut changed = false;
@@ -150,6 +194,7 @@ impl<'a> PointsToGraph<'a> {
                         // eventually get a set). however, we only want the destination's set
                         // to get updated if the destination is a pointer itself. we don't want
                         // to pollute the map with a points-to entry for an integer, for example.
+
                         if let llvm_ir::Type::PointerType { .. } = load.loaded_ty.as_ref()
                             && let Some(operand_var) =
                                 helpers::variable_from_operand(&load.address, f)
@@ -184,6 +229,29 @@ impl<'a> PointsToGraph<'a> {
                         // address operand is if the value operand is mapped at all. as we mentioned above,
                         // it should never be the case that a non-pointer variable (e.g. int) has a points-to set,
                         // so this method should work
+                        if let Some(value_operand) = helpers::variable_from_operand(&store.value, f)
+                            && let Some(value_operand_pts_to_set) = self
+                                .graph
+                                .get(&value_operand)
+                                .map(|s| s.iter().cloned().collect_vec())
+                            && let Some(address_variable) =
+                                helpers::variable_from_operand(&store.address, f)
+                        {
+                            let address_variable_pts_to_set =
+                                self.graph.entry(address_variable).or_default().clone();
+
+                            for mem_location in address_variable_pts_to_set {
+                                let og_set = self
+                                    .graph
+                                    .entry(Variable::AbstractLocation(mem_location.clone()))
+                                    .or_default();
+                                let og_len = og_set.len();
+                                og_set.extend(value_operand_pts_to_set.clone());
+                                let new_len = og_set.len();
+
+                                changed |= new_len > og_len;
+                            }
+                        }
                     }
                     llvm_ir::Instruction::Call(call) => {}
                     _ => (),
@@ -218,7 +286,11 @@ fn main() -> ah::Result<()> {
     points_to_graph.build_graph()?;
     println!("{points_to_graph:#?}");
 
-    let x = points_to_graph.graph.get(&Variable::GlobalVariable(&llvm_ir::Name::Number(1)));
+    let dummy_str = "dummy".to_string();
+    let x = points_to_graph.graph.get(&&Variable::LocalVariable(
+        &dummy_str,
+        &llvm_ir::Name::Number(1),
+    ));
     println!("{x:#?}");
 
     Ok(())
