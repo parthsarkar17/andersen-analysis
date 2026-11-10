@@ -3,18 +3,17 @@ use anyhow as ah;
 use core::fmt;
 use either::Either;
 use itertools::Itertools;
-use llvm_ir::Name;
 use std::collections::{HashMap, HashSet};
 
 /// This type is used as a key into the points-to set map.
 #[derive(Hash, PartialEq, Eq, Debug)]
 pub enum Variable<'a> {
     /// Global pointer variables can be identified by their name alone (if its an object) or by a String (if it's a function)
-    GlobalVariable(Either<&'a String, &'a Name>),
+    GlobalVariable(Either<&'a String, &'a usize>),
 
     /// We need to localize function-local variables into their functions.
     /// The String represents a function name, and Name is the name of the variable
-    LocalVariable(&'a String, &'a llvm_ir::Name),
+    LocalVariable(&'a String, Either<&'a String, &'a usize>),
 
     /// When we load / store pointers from / into pointers-to-pointers, we
     /// need to track the points-to sets of abstract locations themselves.
@@ -29,19 +28,16 @@ pub enum Variable<'a> {
 /// stack allocation region.
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum AbstrLoc<'a> {
-    /// String represents function name
-    // Function(&'a String),
-
     /// String represent global object variable name
-    Global(Either<&'a String, &'a Name>),
+    Global(Either<&'a String, &'a usize>),
 
     /// String represents function name, and "name" represents destination of malloc(..) call
     /// We use function-variable combinations as a unique identifier for this allocation point.
-    MallocPoint(&'a String, &'a llvm_ir::Name),
+    MallocPoint(&'a String, Either<&'a String, &'a usize>),
 
     /// String represents function name, and "name" represents destination of alloca(..) instr.
     /// We use function-variable combinations as a unique identifier for this allocation point.
-    StackAllocPoint(&'a String, &'a llvm_ir::Name),
+    StackAllocPoint(&'a String, Either<&'a String, &'a usize>),
 }
 
 impl<'a> AbstrLoc<'a> {
@@ -52,7 +48,7 @@ impl<'a> AbstrLoc<'a> {
         func: &'a llvm_ir::Function,
         alloca: &'a llvm_ir::instruction::Alloca,
     ) -> AbstrLoc<'a> {
-        AbstrLoc::StackAllocPoint(&func.name, &alloca.dest)
+        AbstrLoc::StackAllocPoint(&func.name, helpers::canonicalize_name(&alloca.dest))
     }
 }
 
@@ -77,27 +73,15 @@ impl<'a> PointsToGraph<'a> {
         }
     }
 
-    /// Given the name of a local pointer variable, this function will return an immutable reference
-    /// to the points-to set of that variable. If the variable is unmapped in the map, then
-    /// we return None.
-    pub fn query_non_deref(
-        &self,
-        func: &'a llvm_ir::Function,
-        name: &'a llvm_ir::Name,
-    ) -> Option<&HashSet<AbstrLoc<'a>>> {
-        let name_var = Variable::LocalVariable(&func.name, name);
-        self.graph.get(&name_var)
-    }
-
     /// Given the name of a local pointer variable, this function will return a mutable reference
     /// to the points-to set of that variable. If the variable is unmapped in the map, then
     /// we insert the map.
-    pub fn query_non_deref_mut(
+    pub fn query_local_mut(
         &mut self,
         func: &'a llvm_ir::Function,
         name: &'a llvm_ir::Name,
     ) -> &mut HashSet<AbstrLoc<'a>> {
-        let name_var = Variable::LocalVariable(&func.name, name);
+        let name_var = Variable::LocalVariable(&func.name, helpers::canonicalize_name(name));
         self.graph.entry(name_var).or_default()
     }
 
@@ -125,9 +109,11 @@ impl<'a> PointsToGraph<'a> {
 
         for glob in &self.module.global_vars {
             let pts_to_set = map
-                .entry(Variable::GlobalVariable(Either::Right(&glob.name)))
+                .entry(Variable::GlobalVariable(helpers::canonicalize_name(
+                    &glob.name,
+                )))
                 .or_default();
-            let abstr_loc = AbstrLoc::Global(Either::Right(&glob.name));
+            let abstr_loc = AbstrLoc::Global(helpers::canonicalize_name(&glob.name));
             pts_to_set.insert(abstr_loc.clone());
             if let Some(initial_memory) = &glob.initializer {
                 map.entry(Variable::AbstractLocation(abstr_loc))
@@ -135,7 +121,7 @@ impl<'a> PointsToGraph<'a> {
                     .extend(
                         helpers::gather_all_global_refs(initial_memory)?
                             .into_iter()
-                            .map(|name| AbstrLoc::Global(Either::Right(name))),
+                            .map(|name| AbstrLoc::Global(helpers::canonicalize_name(name))),
                     );
             }
         }
@@ -150,7 +136,10 @@ impl<'a> PointsToGraph<'a> {
             for (f, _, instr) in &instr_vec {
                 match instr {
                     llvm_ir::Instruction::Alloca(alloca) => {
-                        let ptr_var = Variable::LocalVariable(&f.name, &alloca.dest);
+                        let ptr_var = Variable::LocalVariable(
+                            &f.name,
+                            helpers::canonicalize_name(&alloca.dest),
+                        );
                         let var_pts_to_set = self.graph.entry(ptr_var).or_default();
                         changed |= var_pts_to_set.insert(AbstrLoc::from_alloca(f, alloca));
                     }
@@ -165,7 +154,7 @@ impl<'a> PointsToGraph<'a> {
                                 .map(|s| s.iter().cloned().collect_vec())
                         {
                             // condition for whether the dest set changed is length difference
-                            let dest_pts_to_set = self.query_non_deref_mut(f, &gep.dest);
+                            let dest_pts_to_set = self.query_local_mut(f, &gep.dest);
                             let orig_len = dest_pts_to_set.len();
                             dest_pts_to_set.extend(operand_var_pts_to_set);
                             let new_len = dest_pts_to_set.len();
@@ -181,7 +170,7 @@ impl<'a> PointsToGraph<'a> {
                                 .map(|s| s.iter().cloned().collect_vec())
                         {
                             // condition for whether the dest set changed is length difference
-                            let dest_pts_to_set = self.query_non_deref_mut(f, &bitc.dest);
+                            let dest_pts_to_set = self.query_local_mut(f, &bitc.dest);
                             let orig_len = dest_pts_to_set.len();
                             dest_pts_to_set.extend(operand_var_pts_to_set);
                             let new_len = dest_pts_to_set.len();
@@ -216,7 +205,7 @@ impl<'a> PointsToGraph<'a> {
                                 .flatten()
                                 .collect_vec();
 
-                            let dest_pts_to_set = self.query_non_deref_mut(f, &load.dest);
+                            let dest_pts_to_set = self.query_local_mut(f, &load.dest);
                             let orig_len = dest_pts_to_set.len();
                             dest_pts_to_set.extend(points_to_of_deref_of_operand);
                             let new_len = dest_pts_to_set.len();
@@ -289,7 +278,7 @@ fn main() -> ah::Result<()> {
     let dummy_str = "dummy".to_string();
     let x = points_to_graph.graph.get(&&Variable::LocalVariable(
         &dummy_str,
-        &llvm_ir::Name::Number(1),
+        helpers::canonicalize_name(&llvm_ir::Name::Number(1)),
     ));
     println!("{x:#?}");
 

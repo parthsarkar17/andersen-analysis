@@ -1,5 +1,6 @@
 use crate::Variable;
 use anyhow as ah;
+use either::Either;
 use std::collections::VecDeque;
 /// This function extracts the operand names of pointer expressions. The easiest
 /// case is that of a "local operand", which is just a local variable. Second,
@@ -13,7 +14,9 @@ pub fn variable_from_operand<'a>(
 ) -> Option<Variable<'a>> {
     match op {
         llvm_ir::Operand::MetadataOperand => None,
-        llvm_ir::Operand::LocalOperand { name, .. } => Some(Variable::LocalVariable(&f.name, name)),
+        llvm_ir::Operand::LocalOperand { name, .. } => {
+            Some(Variable::LocalVariable(&f.name, canonicalize_name(name)))
+        }
         llvm_ir::Operand::ConstantOperand(constant) => {
             let mut name_opt = None;
             let mut queue = VecDeque::new();
@@ -25,7 +28,7 @@ pub fn variable_from_operand<'a>(
                         llvm_ir::Constant::BitCast(bitc) => queue.push_back(&bitc.operand),
                         llvm_ir::Constant::GetElementPtr(gep) => queue.push_back(&gep.address),
                         llvm_ir::Constant::GlobalReference { name, .. } => {
-                            name_opt = Some(Variable::GlobalVariable(either::Either::Right(name)))
+                            name_opt = Some(Variable::GlobalVariable(canonicalize_name(name)))
                         }
                         _ => (),
                     },
@@ -87,4 +90,11 @@ pub fn iter_instrs(
         }
     }
     v
+}
+
+pub fn canonicalize_name(name: &llvm_ir::Name) -> Either<&String, &usize> {
+    match name {
+        llvm_ir::Name::Name(name) => Either::Left(&*name),
+        llvm_ir::Name::Number(x) => Either::Right(x),
+    }
 }
