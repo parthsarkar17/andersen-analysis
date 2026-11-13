@@ -18,7 +18,7 @@ pub enum Variable<'a> {
     /// When we load / store pointers from / into pointers-to-pointers, we
     /// need to track the points-to sets of abstract locations themselves.
     /// Hence, we add abstract locations as keys into the map.
-    AbstractLocation(AbstrLoc<'a>),
+    AbstractLocation(&'a AbstrLoc<'a>),
 }
 
 /// This type is used to represent the entries in each
@@ -28,10 +28,10 @@ pub enum Variable<'a> {
 /// stack allocation region.
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum AbstrLoc<'a> {
-    /// String represent global object variable name
+    /// Represents global object variable name
     Global(Either<&'a String, &'a usize>),
 
-    /// String represents function name, and "name" represents destination of malloc(..) call
+    /// String represents function name, and Either represents destination of malloc(..) call
     /// We use function-variable combinations as a unique identifier for this allocation point.
     MallocPoint(&'a String, Either<&'a String, &'a usize>),
 
@@ -50,26 +50,72 @@ impl<'a> AbstrLoc<'a> {
     ) -> AbstrLoc<'a> {
         AbstrLoc::StackAllocPoint(&func.name, helpers::canonicalize_name(&alloca.dest))
     }
+
+    /// Generate an AbstrLoc object representing a malloc site. Must provide
+    /// the parent function (in which the heap alloc occurs), along with the malloc
+    /// call object itself.
+    fn from_malloc(
+        func: &'a llvm_ir::Function,
+        malloc_call: &'a llvm_ir::instruction::Call,
+    ) -> ah::Result<AbstrLoc<'a>> {
+        let malloc_dest =
+            helpers::canonicalize_name(malloc_call.dest.as_ref().ok_or_else(|| {
+                ah::anyhow!("Couldn't find a destination variable for this `malloc` call!")
+            })?);
+        Ok(AbstrLoc::MallocPoint(&func.name, malloc_dest))
+    }
 }
 
-pub struct PointsToGraph<'a> {
+pub struct PointerAnalysis<'a> {
     pub module: &'a llvm_ir::Module,
-    pub graph: HashMap<Variable<'a>, HashSet<AbstrLoc<'a>>>,
+    pub instructions: &'a Vec<(
+        usize,
+        &'a llvm_ir::Function,
+        &'a llvm_ir::BasicBlock,
+        &'a llvm_ir::Instruction,
+    )>,
+    pub graph: HashMap<Variable<'a>, HashSet<&'a AbstrLoc<'a>>>,
+    pub dynamic_memory_objects: &'a HashMap<usize, AbstrLoc<'a>>,
+    pub function_memory_objects: &'a Vec<AbstrLoc<'a>>,
+    pub function_decl_memory_objects: &'a Vec<AbstrLoc<'a>>,
+    pub global_memory_objects: &'a Vec<AbstrLoc<'a>>,
 }
 
-impl<'a> fmt::Debug for PointsToGraph<'a> {
+impl<'a> fmt::Debug for PointerAnalysis<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PointsToGraph")
+        f.debug_struct("PointerAnalysis")
             .field("graph", &self.graph)
             .finish()
     }
 }
 
-impl<'a> PointsToGraph<'a> {
-    pub fn new(module: &'a llvm_ir::Module) -> PointsToGraph<'a> {
+impl<'a> PointerAnalysis<'a> {
+    /// This function instantiates an object representing the pointer analysis results.
+    /// It does not yet contain any points-to information; for that, you must call `build_graph`.
+    /// In order to avoid excessive cloning during the building of the points-to graph, we
+    /// instantiate all of the objects representing abstract locations up front. Then,
+    /// the points-to sets can just reference these objects instead of copying them.
+    pub fn new(
+        module: &'a llvm_ir::Module,
+        instructions: &'a Vec<(
+            usize,
+            &'a llvm_ir::Function,
+            &'a llvm_ir::BasicBlock,
+            &'a llvm_ir::Instruction,
+        )>,
+        dynamic_memory_objects: &'a HashMap<usize, AbstrLoc<'a>>,
+        function_memory_objects: &'a Vec<AbstrLoc<'a>>,
+        function_decl_memory_objects: &'a Vec<AbstrLoc<'a>>,
+        global_memory_objects: &'a Vec<AbstrLoc<'a>>,
+    ) -> PointerAnalysis<'a> {
         Self {
             module,
+            instructions,
             graph: HashMap::new(),
+            dynamic_memory_objects,
+            function_memory_objects,
+            function_decl_memory_objects,
+            global_memory_objects,
         }
     }
 
@@ -80,7 +126,7 @@ impl<'a> PointsToGraph<'a> {
         &mut self,
         func: &'a llvm_ir::Function,
         name: &'a llvm_ir::Name,
-    ) -> &mut HashSet<AbstrLoc<'a>> {
+    ) -> &mut HashSet<&'a AbstrLoc<'a>> {
         let name_var = Variable::LocalVariable(&func.name, helpers::canonicalize_name(name));
         self.graph.entry(name_var).or_default()
     }
@@ -91,38 +137,75 @@ impl<'a> PointsToGraph<'a> {
     /// contains references to other memory locations. This is field insensitive! (for now)
     fn initialize_map_with_globals(&mut self) -> ah::Result<()> {
         let map = &mut self.graph;
-        for f in &self.module.functions {
+        for (i, func) in self.module.functions.iter().enumerate() {
             let pts_to_set = map
-                .entry(Variable::GlobalVariable(Either::Left(&f.name)))
+                .entry(Variable::GlobalVariable(Either::Left(&func.name)))
                 .or_default();
-            let abstr_loc = AbstrLoc::Global(Either::Left(&f.name));
+
+            let abstr_loc = &self.function_memory_objects[i];
             pts_to_set.insert(abstr_loc);
         }
 
-        for f in &self.module.func_declarations {
+        for (i, func_decl) in self.module.func_declarations.iter().enumerate() {
             let pts_to_set = map
-                .entry(Variable::GlobalVariable(Either::Left(&f.name)))
+                .entry(Variable::GlobalVariable(Either::Left(&func_decl.name)))
                 .or_default();
-            let abstr_loc = AbstrLoc::Global(Either::Left(&f.name));
+            let abstr_loc = &self.function_decl_memory_objects[i];
             pts_to_set.insert(abstr_loc);
         }
 
-        for glob in &self.module.global_vars {
+        for (i, glob) in self.module.global_vars.iter().enumerate() {
             let pts_to_set = map
                 .entry(Variable::GlobalVariable(helpers::canonicalize_name(
                     &glob.name,
                 )))
                 .or_default();
-            let abstr_loc = AbstrLoc::Global(helpers::canonicalize_name(&glob.name));
-            pts_to_set.insert(abstr_loc.clone());
+            let abstr_loc = &self.global_memory_objects[i];
+            pts_to_set.insert(abstr_loc);
+
+            // now, for the global memory region G, we go through its initial values
+            // and find references to other globals (functions, function decls, global objects).
+            // if we find them, we add a points-to edge from G to that object
             if let Some(initial_memory) = &glob.initializer {
-                map.entry(Variable::AbstractLocation(abstr_loc))
-                    .or_default()
-                    .extend(
-                        helpers::gather_all_global_refs(initial_memory)?
-                            .into_iter()
-                            .map(|name| AbstrLoc::Global(helpers::canonicalize_name(name))),
-                    );
+                // get the map for G
+                let mem_location_pts_to_set = map
+                    .entry(Variable::AbstractLocation(abstr_loc))
+                    .or_default();
+
+                // find references to other global objects in this memory region
+                let references_in_mem_location = helpers::gather_all_global_refs(initial_memory)?;
+
+                // create an iterator over all objects in global memory
+                let mut global_objs_iter = self
+                    .global_memory_objects
+                    .iter()
+                    .chain(self.function_decl_memory_objects)
+                    .chain(self.function_memory_objects);
+
+                //
+                let abstr_locations_of_references = references_in_mem_location
+                    .into_iter()
+                    .map(|name| {
+                        let canonicalized_name = helpers::canonicalize_name(name);
+                        let abstr_loc = global_objs_iter
+                            .find(|abstr_loc| {
+                                if let AbstrLoc::Global(abstr_loc_name) = abstr_loc {
+                                    &canonicalized_name == abstr_loc_name
+                                } else {
+                                    false
+                                }
+                            })
+                            .ok_or_else(|| {
+                                ah::anyhow!(
+                                    "Couldn't find the abstract location for the global name"
+                                )
+                            })?;
+
+                        Ok(abstr_loc)
+                    })
+                    .collect::<ah::Result<Vec<_>>>()?;
+
+                mem_location_pts_to_set.extend(abstr_locations_of_references);
             }
         }
         Ok(())
@@ -130,10 +213,9 @@ impl<'a> PointsToGraph<'a> {
 
     pub fn build_graph(&mut self) -> ah::Result<()> {
         self.initialize_map_with_globals()?;
-        let instr_vec = helpers::iter_instrs(&self.module);
         loop {
             let mut changed = false;
-            for (f, _, instr) in &instr_vec {
+            for (idx, f, _, instr) in self.instructions {
                 match instr {
                     llvm_ir::Instruction::Alloca(alloca) => {
                         let ptr_var = Variable::LocalVariable(
@@ -141,7 +223,13 @@ impl<'a> PointsToGraph<'a> {
                             helpers::canonicalize_name(&alloca.dest),
                         );
                         let var_pts_to_set = self.graph.entry(ptr_var).or_default();
-                        changed |= var_pts_to_set.insert(AbstrLoc::from_alloca(f, alloca));
+
+                        let Some(alloca_abstr_loc) = self.dynamic_memory_objects.get(idx) else {
+                            return Err(ah::anyhow!(
+                                "Couldn't find the abstract memory location for alloca instruction {instr:?}!"
+                            ));
+                        };
+                        changed |= var_pts_to_set.insert(alloca_abstr_loc);
                     }
                     llvm_ir::Instruction::GetElementPtr(gep) => {
                         // get the stuff pointed to by the operand and put it into the
@@ -187,22 +275,21 @@ impl<'a> PointsToGraph<'a> {
                         if let llvm_ir::Type::PointerType { .. } = load.loaded_ty.as_ref()
                             && let Some(operand_var) =
                                 helpers::variable_from_operand(&load.address, f)
-                            && let Some(operand_var_pts_to_set) = self
-                                .graph
-                                .get(&operand_var)
-                                .map(|s| s.iter().cloned().collect_vec())
+                            && let Some(operand_var_pts_to_set) =
+                                self.graph.get(&operand_var).map(|s| s.iter().collect_vec())
                         {
                             // load constraint says that every location pointed to by
                             // every element of the operand's points-to set should be
                             // flowed into the destination pointer
                             let points_to_of_deref_of_operand = operand_var_pts_to_set
-                                .into_iter()
+                                .iter()
                                 .filter_map(|abstr_loc| {
-                                    self.graph.get(&Variable::AbstractLocation(abstr_loc)).map(
-                                        |abstr_loc_pts_to_set| abstr_loc_pts_to_set.iter().cloned(),
-                                    )
+                                    self.graph
+                                        .get(&Variable::AbstractLocation(abstr_loc))
+                                        .map(|abstr_loc_pts_to_set| abstr_loc_pts_to_set.iter())
                                 })
                                 .flatten()
+                                .cloned()
                                 .collect_vec();
 
                             let dest_pts_to_set = self.query_local_mut(f, &load.dest);
@@ -232,7 +319,7 @@ impl<'a> PointsToGraph<'a> {
                             for mem_location in address_variable_pts_to_set {
                                 let og_set = self
                                     .graph
-                                    .entry(Variable::AbstractLocation(mem_location.clone()))
+                                    .entry(Variable::AbstractLocation(mem_location))
                                     .or_default();
                                 let og_len = og_set.len();
                                 og_set.extend(value_operand_pts_to_set.clone());
@@ -257,6 +344,7 @@ impl<'a> PointsToGraph<'a> {
 }
 
 fn main() -> ah::Result<()> {
+    // get file & parse llvm module object from .ll or .bc file
     let args = std::env::args().collect_vec();
     if args.len() != 2 {
         return Err(ah::anyhow!("usage: cargo run -- <.ll|.bc filename>"));
@@ -271,7 +359,50 @@ fn main() -> ah::Result<()> {
     }
     .map_err(|e| ah::anyhow!("{e}"))?;
 
-    let mut points_to_graph = PointsToGraph::new(&module);
+    // since we're not mutating the file, we can just gather all the memory locations
+    // (globals, functions, function declarations, stack & heap objects) up front
+    // so we can pass references around in the points-to sets instead of allocated objects
+    // representing memory locations
+    let instructions = helpers::iter_instrs(&module);
+    let dynamic_memory_objects = instructions
+        .iter()
+        .filter_map(|(idx, func, _, instr)| match instr {
+            llvm_ir::Instruction::Alloca(alloca) => {
+                Some(Ok((*idx, AbstrLoc::from_alloca(func, &alloca))))
+            }
+            llvm_ir::Instruction::Call(call) => {
+                helpers::is_malloc(call).then(|| Ok((*idx, AbstrLoc::from_malloc(func, call)?)))
+            }
+            _ => None,
+        })
+        .collect::<ah::Result<HashMap<_, _>>>()?;
+
+    let function_memory_objects = module
+        .functions
+        .iter()
+        .map(|func| AbstrLoc::Global(Either::Left(&func.name)))
+        .collect_vec();
+
+    let function_decl_memory_objects = module
+        .func_declarations
+        .iter()
+        .map(|func_decl| AbstrLoc::Global(Either::Left(&func_decl.name)))
+        .collect_vec();
+
+    let global_memory_objects = module
+        .global_vars
+        .iter()
+        .map(|glob| AbstrLoc::Global(helpers::canonicalize_name(&glob.name)))
+        .collect_vec();
+
+    let mut points_to_graph = PointerAnalysis::new(
+        &module,
+        &instructions,
+        &dynamic_memory_objects,
+        &function_memory_objects,
+        &function_decl_memory_objects,
+        &global_memory_objects,
+    );
     points_to_graph.build_graph()?;
     println!("{points_to_graph:#?}");
 

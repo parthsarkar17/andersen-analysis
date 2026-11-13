@@ -77,6 +77,7 @@ pub fn gather_all_global_refs<'a>(
 pub fn iter_instrs(
     m: &llvm_ir::Module,
 ) -> Vec<(
+    usize,
     &llvm_ir::Function,
     &llvm_ir::BasicBlock,
     &llvm_ir::Instruction,
@@ -89,12 +90,30 @@ pub fn iter_instrs(
             }
         }
     }
-    v
+
+    v.into_iter()
+        .enumerate()
+        .map(|(idx, (f, b, i))| (idx, f, b, i))
+        .collect()
 }
 
 pub fn canonicalize_name(name: &llvm_ir::Name) -> Either<&String, &usize> {
     match name {
         llvm_ir::Name::Name(name) => Either::Left(&*name),
         llvm_ir::Name::Number(x) => Either::Right(x),
+    }
+}
+
+/// This function takes a Call object and indicates whether the call is a Malloc or not.
+pub fn is_malloc(call: &llvm_ir::instruction::Call) -> bool {
+    if let Either::Right(operand) = &call.function
+        && let llvm_ir::Operand::ConstantOperand(const_operand) = operand
+        && let llvm_ir::Constant::GlobalReference { name, .. } = const_operand.as_ref()
+        && let llvm_ir::Name::Name(f_name) = name
+        && f_name.as_str() == "malloc"
+    {
+        true
+    } else {
+        false
     }
 }
