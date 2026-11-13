@@ -79,6 +79,7 @@ pub struct PointerAnalysis<'a> {
     pub function_memory_objects: &'a Vec<AbstrLoc<'a>>,
     pub function_decl_memory_objects: &'a Vec<AbstrLoc<'a>>,
     pub global_memory_objects: &'a Vec<AbstrLoc<'a>>,
+    pub functions: HashSet<&'a AbstrLoc<'a>>,
 }
 
 impl<'a> fmt::Debug for PointerAnalysis<'a> {
@@ -116,6 +117,10 @@ impl<'a> PointerAnalysis<'a> {
             function_memory_objects,
             function_decl_memory_objects,
             global_memory_objects,
+            functions: function_decl_memory_objects
+                .iter()
+                .chain(function_decl_memory_objects)
+                .collect(),
         }
     }
 
@@ -329,7 +334,57 @@ impl<'a> PointerAnalysis<'a> {
                             }
                         }
                     }
-                    llvm_ir::Instruction::Call(call) => {}
+                    llvm_ir::Instruction::Call(call) => {
+                        if let Either::Right(function) = &call.function {
+                            let functions_called = match function {
+                                llvm_ir::Operand::ConstantOperand(const_operand) => {
+                                    if let llvm_ir::Constant::GlobalReference { name, .. } =
+                                        const_operand.as_ref()
+                                    {
+                                        Ok(vec![helpers::canonicalize_name(name)])
+                                    } else {
+                                        Err(ah::anyhow!("Uncaught case for a direct call"))
+                                    }
+                                }
+                                llvm_ir::Operand::LocalOperand { name, .. } => {
+                                    let fptr_name = helpers::canonicalize_name(name);
+                                    let fptr_variable = Variable::LocalVariable(&f.name, fptr_name);
+                                    if let Some(pts_to_set) = self.graph.get(&fptr_variable) {
+
+                                        
+                                        Ok(vec![])
+                                    } else {
+                                        Ok(vec![])
+                                    }
+                                    // Ok(vec![])
+                                }
+                                llvm_ir::Operand::MetadataOperand => {
+                                    Err(ah::anyhow!("Call instruction invoked a MetadataOperand?"))
+                                }
+                            }?;
+
+                            let call_args = &call.arguments;
+                            println!("call arguments {call_args:#?}");
+                            match function {
+                                llvm_ir::Operand::ConstantOperand(const_operand) => {
+                                    let llvm_ir::Constant::GlobalReference { name, ty } =
+                                        const_operand.as_ref()
+                                    else {
+                                        return Err(ah::anyhow!("Uncaught case for a direct call"));
+                                    };
+
+                                    let llvm_ir::Type::FuncType { param_types, .. } = ty.as_ref()
+                                    else {
+                                        return Err(ah::anyhow!(
+                                            "Type of function is not Type::FuncType!"
+                                        ));
+                                    };
+                                }
+                                llvm_ir::Operand::LocalOperand { name, ty } => (),
+                                _ => (),
+                            }
+                        }
+                    }
                     _ => (),
                 }
             }
@@ -361,8 +416,7 @@ fn main() -> ah::Result<()> {
 
     // since we're not mutating the file, we can just gather all the memory locations
     // (globals, functions, function declarations, stack & heap objects) up front
-    // so we can pass references around in the points-to sets instead of allocated objects
-    // representing memory locations
+    // so we can pass references around in the points-to sets instead of allocations
     let instructions = helpers::iter_instrs(&module);
     let dynamic_memory_objects = instructions
         .iter()
@@ -406,12 +460,12 @@ fn main() -> ah::Result<()> {
     points_to_graph.build_graph()?;
     println!("{points_to_graph:#?}");
 
-    let dummy_str = "dummy".to_string();
-    let x = points_to_graph.graph.get(&&Variable::LocalVariable(
-        &dummy_str,
-        helpers::canonicalize_name(&llvm_ir::Name::Number(1)),
-    ));
-    println!("{x:#?}");
+    // let dummy_str = "dummy".to_string();
+    // let x = points_to_graph.graph.get(&&Variable::LocalVariable(
+    //     &dummy_str,
+    //     helpers::canonicalize_name(&llvm_ir::Name::Number(1)),
+    // ));
+    // println!("{x:#?}");
 
     Ok(())
 }
