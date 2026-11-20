@@ -1,0 +1,130 @@
+PointerAnalysis {
+    graph: {
+        LocalVariable(
+            "main",
+            Right(
+                1,
+            ),
+        ): {
+            StackAllocPoint(
+                "main",
+                Right(
+                    1,
+                ),
+            ),
+        },
+        AbstractLocation(
+            StackAllocPoint(
+                "escape",
+                Right(
+                    2,
+                ),
+            ),
+        ): {
+            MallocPoint(
+                "escape",
+                Right(
+                    3,
+                ),
+            ),
+        },
+        GlobalVariable(
+            Left(
+                "escape",
+            ),
+        ): {
+            Global(
+                Left(
+                    "escape",
+                ),
+            ),
+        },
+        LocalVariable(
+            "escape",
+            Right(
+                5,
+            ),
+        ): {
+            MallocPoint(
+                "escape",
+                Right(
+                    3,
+                ),
+            ),
+        },
+        LocalVariable(
+            "escape",
+            Right(
+                3,
+            ),
+        ): {
+            MallocPoint(
+                "escape",
+                Right(
+                    3,
+                ),
+            ),
+        },
+        LocalVariable(
+            "escape",
+            Right(
+                4,
+            ),
+        ): {
+            MallocPoint(
+                "escape",
+                Right(
+                    3,
+                ),
+            ),
+        },
+        GlobalVariable(
+            Left(
+                "main",
+            ),
+        ): {
+            Global(
+                Left(
+                    "main",
+                ),
+            ),
+        },
+        LocalVariable(
+            "escape",
+            Right(
+                1,
+            ),
+        ): {
+            StackAllocPoint(
+                "escape",
+                Right(
+                    1,
+                ),
+            ),
+        },
+        GlobalVariable(
+            Left(
+                "malloc",
+            ),
+        ): {
+            Global(
+                Left(
+                    "malloc",
+                ),
+            ),
+        },
+        LocalVariable(
+            "escape",
+            Right(
+                2,
+            ),
+        ): {
+            StackAllocPoint(
+                "escape",
+                Right(
+                    2,
+                ),
+            ),
+        },
+    },
+}

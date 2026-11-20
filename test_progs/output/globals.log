@@ -1,0 +1,221 @@
+PointerAnalysis {
+    graph: {
+        LocalVariable(
+            "identity",
+            Right(
+                5,
+            ),
+        ): {},
+        GlobalVariable(
+            Left(
+                "swap",
+            ),
+        ): {
+            Global(
+                Left(
+                    "swap",
+                ),
+            ),
+        },
+        GlobalVariable(
+            Left(
+                "second_obj",
+            ),
+        ): {
+            Global(
+                Left(
+                    "second_obj",
+                ),
+            ),
+        },
+        LocalVariable(
+            "identity",
+            Right(
+                3,
+            ),
+        ): {
+            StackAllocPoint(
+                "identity",
+                Right(
+                    3,
+                ),
+            ),
+        },
+        LocalVariable(
+            "identity",
+            Right(
+                7,
+            ),
+        ): {},
+        LocalVariable(
+            "identity",
+            Right(
+                4,
+            ),
+        ): {
+            StackAllocPoint(
+                "identity",
+                Right(
+                    4,
+                ),
+            ),
+        },
+        LocalVariable(
+            "swap",
+            Right(
+                4,
+            ),
+        ): {
+            StackAllocPoint(
+                "swap",
+                Right(
+                    4,
+                ),
+            ),
+        },
+        AbstractLocation(
+            Global(
+                Left(
+                    "first_obj",
+                ),
+            ),
+        ): {
+            Global(
+                Left(
+                    "swap",
+                ),
+            ),
+            Global(
+                Left(
+                    "identity",
+                ),
+            ),
+        },
+        LocalVariable(
+            "swap",
+            Right(
+                12,
+            ),
+        ): {},
+        LocalVariable(
+            "swap",
+            Right(
+                3,
+            ),
+        ): {
+            StackAllocPoint(
+                "swap",
+                Right(
+                    3,
+                ),
+            ),
+        },
+        GlobalVariable(
+            Left(
+                "main",
+            ),
+        ): {
+            Global(
+                Left(
+                    "main",
+                ),
+            ),
+        },
+        LocalVariable(
+            "swap",
+            Right(
+                8,
+            ),
+        ): {},
+        AbstractLocation(
+            Global(
+                Left(
+                    "second_obj",
+                ),
+            ),
+        ): {
+            Global(
+                Left(
+                    "identity",
+                ),
+            ),
+            Global(
+                Left(
+                    "swap",
+                ),
+            ),
+        },
+        LocalVariable(
+            "swap",
+            Right(
+                10,
+            ),
+        ): {},
+        LocalVariable(
+            "identity",
+            Right(
+                8,
+            ),
+        ): {},
+        GlobalVariable(
+            Left(
+                "identity",
+            ),
+        ): {
+            Global(
+                Left(
+                    "identity",
+                ),
+            ),
+        },
+        LocalVariable(
+            "main",
+            Right(
+                1,
+            ),
+        ): {
+            StackAllocPoint(
+                "main",
+                Right(
+                    1,
+                ),
+            ),
+        },
+        GlobalVariable(
+            Left(
+                "first_obj",
+            ),
+        ): {
+            Global(
+                Left(
+                    "first_obj",
+                ),
+            ),
+        },
+        LocalVariable(
+            "swap",
+            Right(
+                6,
+            ),
+        ): {},
+        LocalVariable(
+            "swap",
+            Right(
+                5,
+            ),
+        ): {
+            StackAllocPoint(
+                "swap",
+                Right(
+                    5,
+                ),
+            ),
+        },
+        LocalVariable(
+            "identity",
+            Right(
+                10,
+            ),
+        ): {},
+    },
+}
