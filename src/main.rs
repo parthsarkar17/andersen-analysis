@@ -335,13 +335,39 @@ impl<'a> PointerAnalysis<'a> {
                         }
                     }
                     llvm_ir::Instruction::Call(call) => {
+                        // if this is a malloc call, we don't need to flow any information to arguments;
+                        // we just register a new abstract object and move on
+                        if helpers::is_malloc(call) {
+                            let Some(call_dest) = &call.dest else {
+                                continue;
+                            };
+
+                            let ptr_var = Variable::LocalVariable(
+                                &f.name,
+                                helpers::canonicalize_name(call_dest),
+                            );
+                            let var_pts_to_set = self.graph.entry(ptr_var).or_default();
+
+                            let Some(alloca_abstr_loc) = self.dynamic_memory_objects.get(idx)
+                            else {
+                                return Err(ah::anyhow!(
+                                    "Couldn't find the abstract memory location for malloc call {instr:?}!"
+                                ));
+                            };
+                            changed |= var_pts_to_set.insert(alloca_abstr_loc);
+                            continue;
+                        }
+
                         if let Either::Right(function) = &call.function {
-                            let functions_called = match function {
+                            // gather all the functions that may be called at this call site;
+                            // we take into account the fact that calls can be indirect
+                            let functions_maybe_called = match function {
                                 llvm_ir::Operand::ConstantOperand(const_operand) => {
                                     if let llvm_ir::Constant::GlobalReference { name, .. } =
                                         const_operand.as_ref()
                                     {
-                                        Ok(vec![helpers::canonicalize_name(name)])
+                                        let direct_callee = helpers::canonicalize_name(name);
+                                        Ok(vec![direct_callee])
                                     } else {
                                         Err(ah::anyhow!("Uncaught case for a direct call"))
                                     }
@@ -350,38 +376,69 @@ impl<'a> PointerAnalysis<'a> {
                                     let fptr_name = helpers::canonicalize_name(name);
                                     let fptr_variable = Variable::LocalVariable(&f.name, fptr_name);
                                     if let Some(pts_to_set) = self.graph.get(&fptr_variable) {
+                                        let functions = pts_to_set
+                                            .iter()
+                                            .filter_map(|abstr_loc| {
+                                                if let AbstrLoc::Global(glob_id) = abstr_loc
+                                                    && self
+                                                        .function_memory_objects
+                                                        .contains(abstr_loc)
+                                                {
+                                                    Some(glob_id)
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                            .cloned()
+                                            .collect_vec();
 
-                                        
-                                        Ok(vec![])
+                                        Ok(functions)
                                     } else {
                                         Ok(vec![])
                                     }
-                                    // Ok(vec![])
                                 }
                                 llvm_ir::Operand::MetadataOperand => {
                                     Err(ah::anyhow!("Call instruction invoked a MetadataOperand?"))
                                 }
                             }?;
 
+                            // for each such maybe-callee, we propagate the point-to set of each argument
+                            // to its corresponding parameter in the called function. we ignore parameters
+                            // with non-pointer types
                             let call_args = &call.arguments;
-                            println!("call arguments {call_args:#?}");
-                            match function {
-                                llvm_ir::Operand::ConstantOperand(const_operand) => {
-                                    let llvm_ir::Constant::GlobalReference { name, ty } =
-                                        const_operand.as_ref()
-                                    else {
-                                        return Err(ah::anyhow!("Uncaught case for a direct call"));
-                                    };
+                            for callee in functions_maybe_called {
+                                if let Either::Left(callee_name) = callee
+                                    && let Some(callee_function_obj) = self
+                                        .module
+                                        .functions
+                                        .iter()
+                                        .find(|f| &f.name == callee_name)
+                                {
+                                    for (param, (arg, _)) in
+                                        callee_function_obj.parameters.iter().zip(call_args)
+                                    {
+                                        let llvm_ir::Type::PointerType { .. } = param.ty.as_ref()
+                                        else {
+                                            continue;
+                                        };
 
-                                    let llvm_ir::Type::FuncType { param_types, .. } = ty.as_ref()
-                                    else {
-                                        return Err(ah::anyhow!(
-                                            "Type of function is not Type::FuncType!"
-                                        ));
-                                    };
+                                        if let Some(operand_var) =
+                                            helpers::variable_from_operand(arg, f)
+                                            && let Some(arg_pts_to_set) = self
+                                                .graph
+                                                .get(&operand_var)
+                                                .map(|s| s.iter().cloned().collect_vec())
+                                        {
+                                            // condition for whether the dest set changed is length difference
+                                            let param_pts_to_set = self
+                                                .query_local_mut(callee_function_obj, &param.name);
+                                            let orig_len = param_pts_to_set.len();
+                                            param_pts_to_set.extend(arg_pts_to_set);
+                                            let new_len = param_pts_to_set.len();
+                                            changed |= new_len > orig_len
+                                        };
+                                    }
                                 }
-                                llvm_ir::Operand::LocalOperand { name, ty } => (),
-                                _ => (),
                             }
                         }
                     }
